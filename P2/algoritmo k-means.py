@@ -5,7 +5,20 @@ import matplotlib.pyplot as plt
 import mplcursors  # Biblioteca para interatividade
 
 # Leitura do arquivo CSV
-data = pd.read_csv('SP_poluicao_dados.csv')
+data = pd.read_csv('./dados/2021_tarde.csv')
+
+# Remover outliers
+# Imprimir quantidade de dados antes da remoção dos outliers
+print("Quantidade de dados antes da remoção dos outliers:", len(data))
+
+# Remover outliers (definido como valores fora de 3 desvios padrão da média)
+mean_val = data['Valor'].mean()
+std_val = data['Valor'].std()
+data = data[(data['Valor'] >= mean_val - 3 * std_val) & (data['Valor'] <= mean_val + 3 * std_val)]
+
+# Imprimir quantidade de dados depois da remoção dos outliers
+print("Quantidade de dados depois da remoção dos outliers:", len(data))
+
 
 # Selecionando as colunas relevantes
 data_relevant = data[['Estacao', 'Poluente', 'Valor']]
@@ -20,6 +33,9 @@ data_scaled = scaler.fit_transform(data_grouped[['Valor']])
 # Aplicação do KMeans
 kmeans = KMeans(n_clusters=3, random_state=42)  # Ajuste o número de clusters conforme necessário
 data_grouped['Cluster'] = kmeans.fit_predict(data_scaled)
+
+# Obter os centróides dos clusters
+cluster_centers = kmeans.cluster_centers_
 
 # Preparar dados para plotagem
 # Precisamos calcular a média da poluição para cada estação, não apenas por poluente
@@ -40,6 +56,9 @@ estacao_indices = range(len(estacoes))
 plt.figure(figsize=(14, 8))
 scatter = plt.scatter(estacao_indices, valores, c=clusters, cmap='viridis')
 
+# Plotar os centróides dos clusters
+plt.scatter(cluster_centers[:, 0], cluster_means.values, c='red', marker='X', s=200, label='Centróides dos Clusters')
+
 # Configurar o eixo X com os nomes das estações
 plt.xticks(estacao_indices, estacoes, rotation=90)
 
@@ -53,11 +72,13 @@ plt.xlabel('Estação')
 plt.ylabel('Valor Médio de Poluição')
 plt.title('Clusters de Estações de Monitoramento de Poluição')
 plt.colorbar(scatter, label='Cluster')
+plt.legend()
 plt.tight_layout()  # Ajusta o layout para que os rótulos do eixo X sejam completamente visíveis
 
 # Adicionar interatividade
 cursor = mplcursors.cursor(scatter, hover=True)
-cursor.connect("add", lambda sel: sel.annotation.set_text(f"{estacoes[sel.index]}: {valores[sel.index]:.2f} \nCluster: {clusters[sel.index]}"))
+cursor.connect("add", 
+lambda sel: sel.annotation.set_text(f"{estacoes[sel.index]} \nPoluente: {data_grouped['Poluente'].loc[(data_grouped['Estacao'] == estacoes[sel.index]) & (data_grouped['Cluster'] == clusters[sel.index])].values[0]} \nValor médio: {valores[sel.index]:.2f} \nCluster: {clusters[sel.index]}"))
 
 # Alterar o título da janela
 plt.gcf().canvas.manager.set_window_title('Análise de Poluição em Estações de São Paulo')
